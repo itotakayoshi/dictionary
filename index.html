@@ -41,24 +41,24 @@
 </div>
 
 <script>
-    let dictionary = [];
-
     async function loadCSV() {
         const response = await fetch('data.csv');
         const text = await response.text();
-        const lines = text.split('\n');
-        const headers = lines[0].split(',');
+        
+        // 正規表現を使用して、ダブルクォーテーション内のカンマを無視して分割する
+        const rows = text.split(/\r?\n/);
+        const headers = parseCSVRow(rows[0]);
 
         const idxKr = headers.indexOf('Korean_word');
         const idxJp = headers.indexOf('Japanese_meaning');
         const idxMemo = headers.indexOf('memo');
 
-        dictionary = lines.slice(1).filter(line => line.trim() !== '').map(line => {
-            const columns = line.split(',');
+        dictionary = rows.slice(1).filter(line => line.trim() !== '').map(line => {
+            const columns = parseCSVRow(line);
             return {
-                kr: columns[idxKr] || "",
-                jp: columns[idxJp] || "",
-                memo: columns[idxMemo] || ""
+                kr: (columns[idxKr] || "").trim(),
+                jp: (columns[idxJp] || "").trim(),
+                memo: (columns[idxMemo] || "").trim()
             };
         }).filter(item => item.kr || item.jp);
 
@@ -67,52 +67,21 @@
         input.disabled = false;
     }
 
-    // 検索ワードを強調する関数
-    function highlightText(text, query) {
-        if (!query) return text;
-        const re = new RegExp(`(${query})`, 'gi');
-        return text.replace(re, '<span class="highlight">$1</span>');
+    // CSVの1行を正しく分割する補助関数
+    function parseCSVRow(row) {
+        const result = [];
+        let start = 0;
+        let inQuotes = false;
+        for (let i = 0; i < row.length; i++) {
+            if (row[i] === '"') inQuotes = !inQuotes;
+            if (row[i] === ',' && !inQuotes) {
+                result.push(row.substring(start, i).replace(/^"|"$/g, ''));
+                start = i + 1;
+            }
+        }
+        result.push(row.substring(start).replace(/^"|"$/g, ''));
+        return result;
     }
-
-    function formatDisplay(item, query) {
-        // 1. 構文変換（数字上付き & ルビ）
-        let krTag = item.kr.replace(/(\d+)$/, '<sup>$1</sup>');
-        let jpTag = item.jp.replace(/(.)\[(.*?)\]/g, '<ruby>$1<rt>$2</rt></ruby>');
-
-        // 2. 検索ワードの強調（タグを避けて置換するのは複雑なため、簡易的に適用）
-        // ※ルビの中身などは強調されないよう、表示用のHTMLに対して適用
-        let formattedKr = highlightText(krTag, query);
-        let formattedJp = highlightText(jpTag, query);
-
-        let memoHtml = (item.memo && item.memo.trim() !== "" && item.memo !== "NaN") 
-            ? `<span class="memo">＊${item.memo}</span>` 
-            : "";
-
-        return `
-            <div class="result-item">
-                <span class="word">${formattedKr}</span>
-                <span class="meaning">${formattedJp}</span>
-                ${memoHtml}
-            </div>
-        `;
-    }
-
-    function search() {
-        const query = document.getElementById('searchInput').value.trim();
-        const resultsDiv = document.getElementById('results');
-        resultsDiv.innerHTML = '';
-
-        if (!query) return;
-
-        const filtered = dictionary.filter(item => 
-            item.kr.toLowerCase().includes(query.toLowerCase()) || 
-            item.jp.toLowerCase().includes(query.toLowerCase())
-        );
-
-        resultsDiv.innerHTML = filtered.map(item => formatDisplay(item, query)).join('');
-    }
-
-    loadCSV();
 </script>
 </body>
 </html>
