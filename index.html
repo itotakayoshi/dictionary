@@ -3,25 +3,19 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>찾아볼까나</title>
+    <title>찾아볼까な</title>
     <style>
         body { font-family: sans-serif; margin: 0; padding: 20px; background: #f4f7f6; color: #333; }
         .container { max-width: 500px; margin: auto; background: white; padding: 20px; border-radius: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
-        
-        /* タイトル部分のスタイル */
         .header { text-align: center; margin-bottom: 25px; }
         .header h1 { margin: 0; font-size: 1.8rem; color: #2c3e50; }
         .header .sub-title { font-size: 0.9rem; color: #7f8c8d; margin-top: 5px; line-height: 1.4; }
-
         input { width: 100%; padding: 12px; box-sizing: border-box; border: 2px solid #ddd; border-radius: 8px; font-size: 1rem; margin-bottom: 20px; }
         .result-item { padding: 15px; border-bottom: 1px solid #eee; line-height: 1.6; }
         .word { font-weight: bold; color: #e74c3c; font-size: 1.2rem; margin-right: 10px; }
         .meaning { font-size: 1.1rem; }
         .memo { display: block; font-size: 0.9rem; color: #7f8c8d; margin-top: 4px; }
-        
-        /* 検索ワードの強調用 */
         .highlight { background-color: transparent; font-weight: 900; text-decoration: underline; color: #000; }
-        
         ruby rt { font-size: 0.6em; color: #3498db; }
         sup { font-size: 0.6em; color: #95a5a6; vertical-align: super; }
     </style>
@@ -43,38 +37,7 @@
 <script>
     let dictionary = [];
 
-    async function loadCSV() {
-        try {
-            const response = await fetch('data.csv');
-            if (!response.ok) throw new Error("File not found");
-            const text = await response.text();
-            
-            // CSVを正しくパースする (カンマや引用符を考慮)
-            const rows = parseCSV(text);
-            const headers = rows[0];
-
-            const idxKr = headers.indexOf('Korean_word');
-            const idxJp = headers.indexOf('Japanese_meaning');
-            const idxMemo = headers.indexOf('memo');
-
-            dictionary = rows.slice(1).map(columns => {
-                return {
-                    kr: (columns[idxKr] || "").trim(),
-                    jp: (columns[idxJp] || "").trim(),
-                    memo: (columns[idxMemo] || "").trim()
-                };
-            }).filter(item => item.kr || item.jp);
-
-            const input = document.getElementById('searchInput');
-            input.placeholder = "単語検索...";
-            input.disabled = false;
-        } catch (e) {
-            console.error(e);
-            document.getElementById('searchInput').placeholder = "エラー: 読み込めませんでした";
-        }
-    }
-
-    // 複雑なCSV構造を解析する関数
+    // 1. CSV解析関数
     function parseCSV(text) {
         const result = [];
         let row = [];
@@ -95,8 +58,79 @@
         if (col || row.length > 0) { row.push(col); result.push(row); }
         return result;
     }
-    
-    // search() と formatDisplay() は前回のものをそのまま使用
+
+    // 2. データ読み込み
+    async function loadCSV() {
+        try {
+            const response = await fetch('data.csv');
+            if (!response.ok) throw new Error("File not found");
+            const text = await response.text();
+            const rows = parseCSV(text);
+            const headers = rows[0];
+
+            const idxKr = headers.indexOf('Korean_word');
+            const idxJp = headers.indexOf('Japanese_meaning');
+            const idxMemo = headers.indexOf('memo');
+
+            dictionary = rows.slice(1).map(columns => ({
+                kr: (columns[idxKr] || "").trim(),
+                jp: (columns[idxJp] || "").trim(),
+                memo: (columns[idxMemo] || "").trim()
+            })).filter(item => item.kr || item.jp);
+
+            const input = document.getElementById('searchInput');
+            input.placeholder = "単語検索...";
+            input.disabled = false;
+        } catch (e) {
+            console.error(e);
+            document.getElementById('searchInput').placeholder = "エラー: 読み込めませんでした";
+        }
+    }
+
+    // 3. ハイライト処理
+    function highlightText(text, query) {
+        if (!query) return text;
+        const re = new RegExp(`(${query})`, 'gi');
+        return text.replace(re, '<span class="highlight">$1</span>');
+    }
+
+    // 4. 表示フォーマット
+    function formatDisplay(item, query) {
+        let krTag = item.kr.replace(/(\d+)$/, '<sup>$1</sup>');
+        let jpTag = item.jp.replace(/(.)\[(.*?)\]/g, '<ruby>$1<rt>$2</rt></ruby>');
+
+        let formattedKr = highlightText(krTag, query);
+        let formattedJp = highlightText(jpTag, query);
+
+        let memoHtml = (item.memo && item.memo !== "" && item.memo !== "NaN") 
+            ? `<span class="memo">＊${item.memo}</span>` 
+            : "";
+
+        return `
+            <div class="result-item">
+                <span class="word">${formattedKr}</span>
+                <span class="meaning">${formattedJp}</span>
+                ${memoHtml}
+            </div>
+        `;
+    }
+
+    // 5. 検索実行
+    function search() {
+        const query = document.getElementById('searchInput').value.trim();
+        const resultsDiv = document.getElementById('results');
+        resultsDiv.innerHTML = '';
+        if (!query) return;
+
+        const filtered = dictionary.filter(item => 
+            item.kr.toLowerCase().includes(query.toLowerCase()) || 
+            item.jp.toLowerCase().includes(query.toLowerCase())
+        );
+
+        resultsDiv.innerHTML = filtered.map(item => formatDisplay(item, query)).join('');
+    }
+
+    loadCSV();
 </script>
 </body>
 </html>
