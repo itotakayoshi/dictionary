@@ -41,47 +41,62 @@
 </div>
 
 <script>
+    let dictionary = [];
+
     async function loadCSV() {
-        const response = await fetch('data.csv');
-        const text = await response.text();
-        
-        // 正規表現を使用して、ダブルクォーテーション内のカンマを無視して分割する
-        const rows = text.split(/\r?\n/);
-        const headers = parseCSVRow(rows[0]);
+        try {
+            const response = await fetch('data.csv');
+            if (!response.ok) throw new Error("File not found");
+            const text = await response.text();
+            
+            // CSVを正しくパースする (カンマや引用符を考慮)
+            const rows = parseCSV(text);
+            const headers = rows[0];
 
-        const idxKr = headers.indexOf('Korean_word');
-        const idxJp = headers.indexOf('Japanese_meaning');
-        const idxMemo = headers.indexOf('memo');
+            const idxKr = headers.indexOf('Korean_word');
+            const idxJp = headers.indexOf('Japanese_meaning');
+            const idxMemo = headers.indexOf('memo');
 
-        dictionary = rows.slice(1).filter(line => line.trim() !== '').map(line => {
-            const columns = parseCSVRow(line);
-            return {
-                kr: (columns[idxKr] || "").trim(),
-                jp: (columns[idxJp] || "").trim(),
-                memo: (columns[idxMemo] || "").trim()
-            };
-        }).filter(item => item.kr || item.jp);
+            dictionary = rows.slice(1).map(columns => {
+                return {
+                    kr: (columns[idxKr] || "").trim(),
+                    jp: (columns[idxJp] || "").trim(),
+                    memo: (columns[idxMemo] || "").trim()
+                };
+            }).filter(item => item.kr || item.jp);
 
-        const input = document.getElementById('searchInput');
-        input.placeholder = "単語検索...";
-        input.disabled = false;
+            const input = document.getElementById('searchInput');
+            input.placeholder = "単語検索...";
+            input.disabled = false;
+        } catch (e) {
+            console.error(e);
+            document.getElementById('searchInput').placeholder = "エラー: 読み込めませんでした";
+        }
     }
 
-    // CSVの1行を正しく分割する補助関数
-    function parseCSVRow(row) {
+    // 複雑なCSV構造を解析する関数
+    function parseCSV(text) {
         const result = [];
-        let start = 0;
+        let row = [];
+        let col = "";
         let inQuotes = false;
-        for (let i = 0; i < row.length; i++) {
-            if (row[i] === '"') inQuotes = !inQuotes;
-            if (row[i] === ',' && !inQuotes) {
-                result.push(row.substring(start, i).replace(/^"|"$/g, ''));
-                start = i + 1;
+        for (let i = 0; i < text.length; i++) {
+            let char = text[i];
+            let nextChar = text[i+1];
+            if (inQuotes && char === '"' && nextChar === '"') { col += '"'; i++; continue; }
+            if (char === '"') { inQuotes = !inQuotes; continue; }
+            if (char === ',' && !inQuotes) { row.push(col); col = ""; continue; }
+            if ((char === '\r' || char === '\n') && !inQuotes) {
+                if (char === '\r' && nextChar === '\n') i++;
+                row.push(col); result.push(row); row = []; col = ""; continue;
             }
+            col += char;
         }
-        result.push(row.substring(start).replace(/^"|"$/g, ''));
+        if (col || row.length > 0) { row.push(col); result.push(row); }
         return result;
     }
+    
+    // search() と formatDisplay() は前回のものをそのまま使用
 </script>
 </body>
 </html>
