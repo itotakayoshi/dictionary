@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>찾아볼까な</title>
+    <title>찾아볼까나</title>
     <style>
         body { font-family: sans-serif; margin: 0; padding: 20px; background: #f4f7f6; color: #333; }
         .container { max-width: 500px; margin: auto; background: white; padding: 20px; border-radius: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
@@ -12,11 +12,19 @@
         .header .sub-title { font-size: 0.9rem; color: #7f8c8d; margin-top: 5px; line-height: 1.4; }
         input { width: 100%; padding: 12px; box-sizing: border-box; border: 2px solid #ddd; border-radius: 8px; font-size: 1rem; margin-bottom: 20px; }
         .result-item { padding: 15px; border-bottom: 1px solid #eee; line-height: 1.6; }
-        .word { font-weight: bold; color: #e74c3c; font-size: 1.2rem; margin-right: 10px; }
-        .meaning { font-size: 1.1rem; }
+        
+        /* 韓国語: 青色 + 太字 */
+        .word { font-weight: bold; color: #0077cc; font-size: 1.2rem; margin-right: 10px; }
+        /* 日本語: 黒 */
+        .meaning { font-size: 1.1rem; color: #333; }
         .memo { display: block; font-size: 0.9rem; color: #7f8c8d; margin-top: 4px; }
-        .highlight { background-color: transparent; font-weight: 900; text-decoration: underline; color: #000; }
+        
+        /* 強調スタイル */
+        .highlight-kr { text-decoration: underline; text-underline-offset: 3px; }
+        .highlight-jp { text-decoration: underline; font-weight: bold; text-underline-offset: 3px; }
+        
         ruby rt { font-size: 0.6em; color: #3498db; }
+        /* 上付き数字: 灰色 */
         sup { font-size: 0.6em; color: #95a5a6; vertical-align: super; }
     </style>
 </head>
@@ -25,10 +33,7 @@
 <div class="container">
     <div class="header">
         <h1>찾아볼까나</h1>
-        <div class="sub-title">
-            チャジャボルカナ<br>
-            初級学習者用簡易韓日辞典
-        </div>
+        <div class="sub-title">チャジャボルカナ<br>初級学習者用簡易韓日辞典</div>
     </div>
     <input type="text" id="searchInput" placeholder="読み込み中..." disabled oninput="search()">
     <div id="results"></div>
@@ -37,20 +42,16 @@
 <script>
     let dictionary = [];
 
-    // 1. CSV解析関数
     function parseCSV(text) {
         const result = [];
-        let row = [];
-        let col = "";
-        let inQuotes = false;
+        let row = [], col = "", inQuotes = false;
         for (let i = 0; i < text.length; i++) {
-            let char = text[i];
-            let nextChar = text[i+1];
-            if (inQuotes && char === '"' && nextChar === '"') { col += '"'; i++; continue; }
+            let char = text[i], next = text[i+1];
+            if (inQuotes && char === '"' && next === '"') { col += '"'; i++; continue; }
             if (char === '"') { inQuotes = !inQuotes; continue; }
             if (char === ',' && !inQuotes) { row.push(col); col = ""; continue; }
             if ((char === '\r' || char === '\n') && !inQuotes) {
-                if (char === '\r' && nextChar === '\n') i++;
+                if (char === '\r' && next === '\n') i++;
                 row.push(col); result.push(row); row = []; col = ""; continue;
             }
             col += char;
@@ -59,7 +60,6 @@
         return result;
     }
 
-    // 2. データ読み込み
     async function loadCSV() {
         try {
             const response = await fetch('data.csv');
@@ -67,67 +67,64 @@
             const text = await response.text();
             const rows = parseCSV(text);
             const headers = rows[0];
+            const idxKr = headers.indexOf('Korean_word'), idxJp = headers.indexOf('Japanese_meaning'), idxMemo = headers.indexOf('memo');
 
-            const idxKr = headers.indexOf('Korean_word');
-            const idxJp = headers.indexOf('Japanese_meaning');
-            const idxMemo = headers.indexOf('memo');
-
-            dictionary = rows.slice(1).map(columns => ({
-                kr: (columns[idxKr] || "").trim(),
-                jp: (columns[idxJp] || "").trim(),
-                memo: (columns[idxMemo] || "").trim()
+            dictionary = rows.slice(1).map(cols => ({
+                kr: (cols[idxKr] || "").trim(),
+                jp: (cols[idxJp] || "").trim(),
+                memo: (cols[idxMemo] || "").trim()
             })).filter(item => item.kr || item.jp);
 
             const input = document.getElementById('searchInput');
-            input.placeholder = "単語検索...";
-            input.disabled = false;
+            input.placeholder = "単語検索..."; input.disabled = false;
         } catch (e) {
-            console.error(e);
             document.getElementById('searchInput').placeholder = "エラー: 読み込めませんでした";
         }
     }
 
-    // 3. ハイライト処理
-    function highlightText(text, query) {
+    function highlightText(text, query, className) {
         if (!query) return text;
         const re = new RegExp(`(${query})`, 'gi');
-        return text.replace(re, '<span class="highlight">$1</span>');
+        return text.replace(re, `<span class="${className}">$1</span>`);
     }
 
-    // 4. 表示フォーマット
     function formatDisplay(item, query) {
         let krTag = item.kr.replace(/(\d+)$/, '<sup>$1</sup>');
         let jpTag = item.jp.replace(/(.)\[(.*?)\]/g, '<ruby>$1<rt>$2</rt></ruby>');
 
-        let formattedKr = highlightText(krTag, query);
-        let formattedJp = highlightText(jpTag, query);
-
-        let memoHtml = (item.memo && item.memo !== "" && item.memo !== "NaN") 
-            ? `<span class="memo">＊${item.memo}</span>` 
-            : "";
-
         return `
             <div class="result-item">
-                <span class="word">${formattedKr}</span>
-                <span class="meaning">${formattedJp}</span>
-                ${memoHtml}
+                <span class="word">${highlightText(krTag, query, 'highlight-kr')}</span>
+                <span class="meaning">${highlightText(jpTag, query, 'highlight-jp')}</span>
+                ${(item.memo && item.memo !== "" && item.memo !== "NaN") ? `<span class="memo">＊${item.memo}</span>` : ""}
             </div>
         `;
     }
 
-    // 5. 検索実行
     function search() {
         const query = document.getElementById('searchInput').value.trim();
         const resultsDiv = document.getElementById('results');
         resultsDiv.innerHTML = '';
         if (!query) return;
 
-        const filtered = dictionary.filter(item => 
-            item.kr.toLowerCase().includes(query.toLowerCase()) || 
-            item.jp.toLowerCase().includes(query.toLowerCase())
-        );
+        const qLower = query.toLowerCase();
+        
+        // ソート処理: 前方一致を優先
+        const startsWith = [];
+        const contains = [];
 
-        resultsDiv.innerHTML = filtered.map(item => formatDisplay(item, query)).join('');
+        dictionary.forEach(item => {
+            const krLower = item.kr.toLowerCase();
+            const jpLower = item.jp.toLowerCase();
+            if (krLower.startsWith(qLower) || jpLower.startsWith(qLower)) {
+                startsWith.push(item);
+            } else if (krLower.includes(qLower) || jpLower.includes(qLower)) {
+                contains.push(item);
+            }
+        });
+
+        const sorted = [...startsWith, ...contains];
+        resultsDiv.innerHTML = sorted.map(item => formatDisplay(item, query)).join('');
     }
 
     loadCSV();
