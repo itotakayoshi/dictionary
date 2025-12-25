@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Beginner's JP-KR Dictionary</title>
+    <style>
+        body { font-family: sans-serif; margin: 0; padding: 20px; background: #f4f7f6; color: #333; }
+        .container { max-width: 500px; margin: auto; background: white; padding: 20px; border-radius: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
+        h1 { font-size: 1.2rem; text-align: center; color: #2c3e50; }
+        input { width: 100%; padding: 12px; box-sizing: border-box; border: 2px solid #ddd; border-radius: 8px; font-size: 1rem; margin-bottom: 20px; }
+        input:focus { border-color: #3498db; outline: none; }
+        .result-item { padding: 15px; border-bottom: 1px solid #eee; animation: fadeIn 0.3s; }
+        .word { font-weight: bold; color: #e74c3c; font-size: 1.1rem; }
+        .meaning { color: #2ecc71; margin-left: 10px; }
+        .reading { font-size: 0.8rem; color: #7f8c8d; display: block; margin-top: 4px; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h1>日韓・韓日 簡易辞書</h1>
+    <input type="text" id="searchInput" placeholder="単語を入力... (例: りんご / 사과)" oninput="search()">
+    <div id="results"></div>
+</div>
+
+<script>
+    // 辞書データ（ここを自由に追加・編集する）
+    const dictionary = [
+        { jp: "りんご", kr: "사과", rom: "Sagwa" },
+        { jp: "こんにちは", kr: "안녕하세요", rom: "Annyeong-haseyo" },
+        { jp: "食べる", kr: "먹다", rom: "Meokda" },
+        { jp: "水", kr: "물", rom: "Mul" },
+        { jp: "友達", kr: "친구", rom: "Chingu" }
+    ];
+
+    function search() {
+        const query = document.getElementById('searchInput').value.toLowerCase();
+        const resultsDiv = document.getElementById('results');
+        resultsDiv.innerHTML = '';
+
+        if (query === '') return;
+
+        const filtered = dictionary.filter(item => 
+            item.jp.includes(query) || item.kr.includes(query)
+        );
+
+        filtered.forEach(item => {
+            const div = document.createElement('div');
+            div.className = 'result-item';
+            div.innerHTML = `
+                <span class="word">${item.kr}</span> 
+                <span class="meaning">${item.jp}</span>
+                <span class="reading">発音イメージ: ${item.rom}</span>
+            `;
+            resultsDiv.appendChild(div);
+        });
+    }
+</script>
+
+</body>
+</html>
